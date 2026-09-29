@@ -1,0 +1,11 @@
+[
+  {"file":"self-intersection.geojson","status":422,"code":"INVALID_INPUT","objectId":"bowtie","field":"geometry","messageContains":"Невалидная геометрия"},
+  {"file":"duplicate-id.geojson","status":422,"code":"INVALID_INPUT","objectId":"same","field":"properties.id","messageContains":"Дублирующийся id"},
+  {"file":"flow-zero.geojson","status":422,"code":"INVALID_INPUT","objectId":"target","field":"properties.flow_tph","messageContains":"flow_tph"},
+  {"file":"flow-string.geojson","status":422,"code":"INVALID_INPUT","objectId":"target","field":"properties.flow_tph","messageContains":"flow_tph"},
+  {"file":"diameter-out-of-table.geojson","status":422,"code":"INVALID_INPUT","objectId":"old","field":"properties.diameter","messageContains":"diameter"},
+  {"file":"null-geometry.geojson","status":422,"code":"INVALID_INPUT","objectId":"target","field":"geometry","messageContains":"geometry"},
+  {"file":"broken-json.geojson","status":422,"code":"INVALID_INPUT","objectId":null,"field":"$","messageContains":"Некорректный JSON"},
+  {"file":"empty-feature-collection.geojson","status":422,"code":"INVALID_INPUT","objectId":null,"field":"features","messageContains":"Отсутствует source"},
+  {"file":"coordinates-outside-wgs84.geojson","status":422,"code":"INVALID_INPUT","objectId":"target","field":"geometry","messageContains":"WGS84"}
+]
