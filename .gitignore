@@ -1,11 +1,9 @@
-# Java / Maven
 target/
 *.class
 *.jar
 !.mvn/wrapper/*.jar
 *.log
 
-# IDE
 .idea/
 *.iml
 .vscode/
@@ -13,20 +11,16 @@ target/
 .project
 .classpath
 
-# OS
 .DS_Store
 Thumbs.db
 
-# Local env
 .env
 data/uploads/
 data/tmp/
 data/results/*
-# итоговая выгрузка на конкурсном наборе — в репозитории (CLAUDE.md)
 !data/results/final/
 data/synthetic/fuzz/
 data/cases/out/
 
-# Reproducible large fixtures
 data/synthetic/large*.geojson
 __pycache__/
