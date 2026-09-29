@@ -1,0 +1,132 @@
+# Профиль правил: тепловые сети. Обязательная часть — таблица 2 Технического приложения ЛЦТ 2026
+# (значения совпадают с ru.lct.heat.model.ref.RestrictionRules, есть тест на совпадение).
+# Секция «extension» — дополнительные типы сверх обязательных (описание кейса §2.6: метро, школы, детсады…);
+# значения отступов приняты по СП 124.13330 / здравому смыслу и помечены note — уточняются заказчиком.
+name: heat
+description: "Тепловые сети: Техническое приложение ЛЦТ 2026, таблица 2 + расширения"
+
+# неизвестный restriction_type — консервативно: запрет с отступом 1 м
+unknown_type:
+  rule: forbidden
+  min_distance_m: 1.0
+
+# алиасы: типы из других источников данных → канонический тип
+aliases:
+  school: social_area
+  kindergarten: social_area
+  hospital: social_area
+  detsad: social_area
+  building: oks
+  river: water
+  pond: water
+  rail: railway
+  tram: tram_tracks
+  gas: gas_pipeline
+  cable: power_cable
+
+rules:
+  # ---- обязательные (таблица 2) ----
+  - type: oks
+    rule: forbidden
+    min_distance_m: 5.0          # 5 м при ДУ<500, 7 м при 500–800, 9 м при ≥900 — зависимость от ДУ в коде
+  - type: park
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: social_area
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: prohibited_site
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: water
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: railway
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: road
+    rule: special
+    min_distance_m: 1.5
+    min_crossing_angle_deg: 45
+    special_margin_m: 3.0
+    k_special: 1.60
+    vertical_clearance_m: 1.0      # режим с глубиной: верх габарита не выше 1.0 м под дорогой
+    cross_under_only: true
+  - type: tram_tracks
+    rule: special
+    min_distance_m: 1.5
+    min_crossing_angle_deg: 45
+    special_margin_m: 3.0
+    k_special: 1.75
+    vertical_clearance_m: 1.2
+    cross_under_only: true
+  - type: gas_pipeline
+    rule: special
+    min_distance_m: 2.0
+    special_margin_m: 2.0
+    k_special: 1.25
+    own_width_m: 0.40
+    own_height_m: 0.40
+    own_depth_m: 2.8
+    vertical_clearance_m: 0.2
+  - type: power_cable
+    rule: special
+    min_distance_m: 2.0
+    special_margin_m: 2.0
+    k_special: 1.15
+    own_width_m: 0.20
+    own_height_m: 0.20
+    own_depth_m: 2.7
+    vertical_clearance_m: 0.5
+  - type: heat_network               # существующая тепловая сеть, пересечение без врезки (FAQ п.10)
+    rule: special
+    min_distance_m: 1.0
+    special_margin_m: 2.0
+    k_special: 1.05
+    own_depth_m: 3.0                 # габарит по ДУ участка подставляется в коде
+    vertical_clearance_m: 0.5
+
+  # ---- расширения (не обязательны, плюс к оценке) ----
+  - type: metro
+    rule: forbidden
+    min_distance_m: 5.0
+    extension: true
+    note: "сооружения метрополитена: запрет, отступ принят 5 м (уточнить у заказчика)"
+  - type: cemetery
+    rule: forbidden
+    min_distance_m: 3.0
+    extension: true
+    note: "кладбища: запрет, отступ принят 3 м"
+  - type: water_pipeline
+    rule: special
+    min_distance_m: 1.5
+    special_margin_m: 2.0
+    k_special: 1.10
+    own_width_m: 0.50
+    own_height_m: 0.50
+    own_depth_m: 2.5
+    vertical_clearance_m: 0.2
+    extension: true
+    note: "водопровод: спецпроход по аналогии с газопроводом, K принят 1.10"
+  - type: sewer
+    rule: special
+    min_distance_m: 1.5
+    special_margin_m: 2.0
+    k_special: 1.10
+    own_width_m: 0.60
+    own_height_m: 0.60
+    own_depth_m: 3.5
+    vertical_clearance_m: 0.2
+    extension: true
+    note: "канализация: спецпроход, K принят 1.10"
+  - type: telecom
+    rule: special
+    min_distance_m: 1.0
+    special_margin_m: 2.0
+    k_special: 1.05
+    own_width_m: 0.20
+    own_height_m: 0.20
+    own_depth_m: 1.0
+    vertical_clearance_m: 0.3
+    extension: true
+    note: "кабели связи: спецпроход, K принят 1.05"

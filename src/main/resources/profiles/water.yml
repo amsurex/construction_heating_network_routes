@@ -1,0 +1,84 @@
+# Профиль правил: водопровод (демонстрация универсальности алгоритма под другой ресурс).
+# Значения — ИЛЛЮСТРАТИВНЫЕ (по мотивам СП 42.13330, табл. 12.5/12.6), не нормативные: показывают, что все
+# отступы, коэффициенты и условия пересечения — данные профиля, а не код. Справочник ДУ/стоимости общий.
+name: water
+description: "Водопровод (пример профиля): другие отступы, теплосеть как пересекаемая коммуникация"
+
+unknown_type:
+  rule: forbidden
+  min_distance_m: 1.0
+
+aliases:
+  school: social_area
+  kindergarten: social_area
+  building: oks
+
+rules:
+  - type: oks
+    rule: forbidden
+    min_distance_m: 5.0
+  - type: park
+    rule: forbidden
+    min_distance_m: 1.5
+  - type: social_area
+    rule: forbidden
+    min_distance_m: 1.5
+  - type: prohibited_site
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: water
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: railway
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: road
+    rule: special
+    min_distance_m: 2.0
+    min_crossing_angle_deg: 45
+    special_margin_m: 3.0
+    k_special: 1.50
+    vertical_clearance_m: 1.0
+    cross_under_only: true
+  - type: tram_tracks
+    rule: special
+    min_distance_m: 2.0
+    min_crossing_angle_deg: 45
+    special_margin_m: 3.0
+    k_special: 1.60
+    vertical_clearance_m: 1.2
+    cross_under_only: true
+  - type: gas_pipeline
+    rule: special
+    min_distance_m: 1.0
+    special_margin_m: 2.0
+    k_special: 1.20
+    own_width_m: 0.40
+    own_height_m: 0.40
+    own_depth_m: 2.8
+    vertical_clearance_m: 0.2
+  - type: power_cable
+    rule: special
+    min_distance_m: 0.5
+    special_margin_m: 2.0
+    k_special: 1.10
+    own_width_m: 0.20
+    own_height_m: 0.20
+    own_depth_m: 2.7
+    vertical_clearance_m: 0.5
+  - type: heat_network               # существующая сеть того же ресурса (во входе всегда heat_network), пересечение без врезки
+    rule: special
+    min_distance_m: 1.5
+    special_margin_m: 2.0
+    k_special: 1.10
+    own_depth_m: 3.0
+    vertical_clearance_m: 0.5
+  - type: sewer
+    rule: special
+    min_distance_m: 1.5
+    special_margin_m: 2.0
+    k_special: 1.10
+    own_width_m: 0.60
+    own_height_m: 0.60
+    own_depth_m: 3.5
+    vertical_clearance_m: 0.4

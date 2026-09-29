@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="КРОТ — комплекс расчёта оптимальных трасс подключения ОКС">
+  <title>КРОТ · Комплекс расчёта оптимальных трасс</title>
+  <link rel="icon" type="image/png" href="/assets/krot-mascot.png">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-mark" src="/assets/krot-mascot.png" alt="Логотип КРОТ">
+      <div><strong>КРОТ</strong><span>Комплекс расчёта оптимальных трасс</span></div>
+    </div>
+    <div class="topbar-actions">
+      <span class="event-badge">ЛЦТ 2026</span>
+      <span id="service-state" class="service-state"><i></i>Проверяем сервис</span>
+      <a href="/swagger-ui/index.html" target="_blank" rel="noopener">API для экспертов ↗</a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="control-panel">
+      <section class="panel-intro">
+        <span class="eyebrow">Новый расчёт</span>
+        <h1>Рассчитайте оптимальные трассы</h1>
+        <p>Один исходный GeoJSON — остальное КРОТ сделает сам: проверит данные, построит варианты и объяснит результат.</p>
+        <div class="intro-chips"><span>3 варианта</span><span>2D / 3D</span><span>Проверка ТЗ</span></div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading"><span class="step">1</span><div><strong>Исходные данные</strong><small>GeoJSON · до 3 ГБ</small></div></div>
+        <label id="drop-zone" class="drop-zone" for="source-file">
+          <input id="source-file" type="file" accept=".geojson,.json,application/geo+json,application/json">
+          <span class="upload-icon" aria-hidden="true">↑</span>
+          <strong id="file-title">Выберите GeoJSON</strong>
+          <span id="file-caption">или перетащите файл сюда</span>
+        </label>
+        <div id="input-summary" class="input-summary" hidden></div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading"><span class="step">2</span><div><strong>Параметры</strong><small>режим расчёта и профиль</small></div></div>
+        <fieldset class="segmented" aria-label="Режим расчёта">
+          <label><input type="radio" name="mode" value="PLAN_2D" checked><span>План 2D<small>быстрый расчёт</small></span></label>
+          <label><input type="radio" name="mode" value="DEPTH_3D"><span>Глубина 3D<small>профиль трассы</small></span></label>
+        </fieldset>
+        <label class="field-label" for="resource">Профиль правил</label>
+        <select id="resource">
+          <option value="heat">Тепловая сеть</option>
+          <option value="water">Водоснабжение · демонстрационный</option>
+          <option value="cable">Кабель · демонстрационный</option>
+        </select>
+        <details class="expert-settings">
+          <summary>Экспертные ограничения</summary>
+          <label>Закрепить точки врезки<input id="pin-tie-in" placeholder="например: 106, 110"></label>
+          <label>Исключить точки врезки<input id="exclude-tie-in" placeholder="id через запятую"></label>
+          <label>Исключить ограничения<input id="exclude-restriction" placeholder="id через запятую"></label>
+        </details>
+      </section>
+
+      <section class="panel-section action-section">
+        <div class="section-heading"><span class="step">3</span><div><strong>Запуск</strong><small>результат появится автоматически</small></div></div>
+        <button id="start" class="primary-button" disabled><span>Запустить расчёт</span><i aria-hidden="true">→</i></button>
+        <div id="job-card" class="job-card" hidden>
+          <div class="job-head"><span id="job-status" class="status-badge">Подготовка</span><span id="job-time">0:00</span></div>
+          <strong id="job-title">Загружаем данные</strong>
+          <p id="job-message">Не закрывайте страницу до завершения загрузки.</p>
+          <div class="progress"><i id="job-progress"></i></div>
+          <div class="job-actions">
+            <span id="job-id"></span>
+            <button id="cancel" class="text-button" type="button">Отменить</button>
+          </div>
+        </div>
+        <div id="input-errors" class="diagnostics" hidden></div>
+      </section>
+    </aside>
+
+    <section class="map-stage" aria-label="Карта результата">
+      <div id="map"></div>
+      <div id="empty-map" class="empty-map">
+        <div class="empty-mascot"><img src="/assets/krot-mascot.png" alt=""></div>
+        <strong>КРОТ готов строить</strong>
+        <span>Загрузите GeoJSON — здесь появятся исходные данные и рассчитанные трассы</span>
+      </div>
+      <div class="map-toolbar">
+        <button id="fit-all" title="Показать все объекты" disabled>Все объекты</button>
+        <button id="fit-route" title="Показать выбранную трассу" disabled>Трасса</button>
+        <details class="layers-menu">
+          <summary>Слои</summary>
+          <label><input id="layer-restrictions" type="checkbox" checked> Ограничения</label>
+          <label><input id="layer-existing" type="checkbox" checked> Существующая сеть</label>
+          <label><input id="layer-route" type="checkbox" checked> Новая сеть</label>
+          <label><input id="layer-points" type="checkbox" checked> Узлы и ОКС</label>
+          <label><input id="layer-labels" type="checkbox"> Подписи ДУ</label>
+        </details>
+      </div>
+      <div class="map-legend">
+        <span><i class="legend-existing"></i>Существующая</span>
+        <span><i class="legend-route"></i>Новая</span>
+        <span><i class="legend-special"></i>Спецпроход</span>
+        <span><i class="legend-error"></i>Нарушение</span>
+      </div>
+    </section>
+
+    <aside id="analytics" class="analytics-panel">
+      <div class="analytics-head">
+        <div><span class="eyebrow">Результат</span><h2>Аналитика трасс</h2></div>
+        <span id="validation-chip" class="validation-chip neutral">Нет расчёта</span>
+      </div>
+      <label class="field-label" for="variant">Вариант трассировки</label>
+      <select id="variant" disabled><option>Сначала запустите расчёт</option></select>
+      <nav class="tabs" aria-label="Разделы аналитики">
+        <button class="active" data-tab="overview">Обзор</button>
+        <button data-tab="compare">Сравнение</button>
+        <button data-tab="quality">Проверка</button>
+      </nav>
+
+      <div id="tab-overview" class="tab-content active">
+        <div class="metric-grid">
+          <article><span>Итоговый score</span><strong id="metric-score">—</strong><small>меньше — лучше</small></article>
+          <article><span>Стоимость</span><strong id="metric-cost">—</strong><small id="metric-penalty">без штрафов</small></article>
+          <article><span>Новая сеть</span><strong id="metric-length">—</strong><small id="metric-special">— спецпроходов</small></article>
+          <article><span>Подключено ОКС</span><strong id="metric-coverage">—</strong><small id="metric-unconnected">нет данных</small></article>
+        </div>
+        <section class="analytics-block">
+          <h3>Структура трассы</h3>
+          <div id="route-stats" class="stat-list empty-content">Выполните расчёт</div>
+        </section>
+        <section class="analytics-block">
+          <h3>Диаметры и стоимость труб</h3>
+          <div id="diameter-chart" class="bar-chart empty-content">Нет данных</div>
+        </section>
+        <section id="depth-block" class="analytics-block" hidden>
+          <h3>Продольный профиль глубины</h3>
+          <p id="depth-caption" class="block-caption"></p>
+          <svg id="depth-profile" viewBox="0 0 360 170" role="img" aria-label="Профиль глубины"></svg>
+        </section>
+        <section class="analytics-block">
+          <h3>Почему выбран этот вариант</h3>
+          <p id="variant-explanation" class="explanation">После расчёта здесь появится объяснение ранжирования.</p>
+        </section>
+      </div>
+
+      <div id="tab-compare" class="tab-content">
+        <p class="block-caption">Варианты ранжируются по стоимости и длине. Нажмите строку, чтобы показать трассу.</p>
+        <div class="table-wrap"><table class="comparison-table"><thead><tr><th>Ранг</th><th>Score</th><th>Стоимость</th><th>Длина</th><th>ОКС</th></tr></thead><tbody id="comparison-body"><tr><td colspan="5">Нет данных</td></tr></tbody></table></div>
+        <section class="analytics-block">
+          <h3>Различие вариантов</h3>
+          <div id="overlap-list" class="stat-list empty-content">Нет данных</div>
+        </section>
+      </div>
+
+      <div id="tab-quality" class="tab-content">
+        <div class="quality-summary">
+          <article><span>Ошибки</span><strong id="quality-errors">—</strong></article>
+          <article><span>Предупреждения</span><strong id="quality-warnings">—</strong></article>
+          <article><span>Проверок</span><strong id="quality-checks">—</strong></article>
+        </div>
+        <label class="toggle"><input id="show-violations" type="checkbox"><span></span>Показать диагностику на карте</label>
+        <section class="analytics-block">
+          <h3>Проверки по правилам ТЗ</h3>
+          <div class="table-wrap"><table class="rules-table"><thead><tr><th>Правило</th><th>Проверок</th><th>Ошибок</th><th>Предупр.</th></tr></thead><tbody id="rules-body"><tr><td colspan="4">Нет отчёта</td></tr></tbody></table></div>
+        </section>
+        <section class="analytics-block">
+          <h3>Диагностика</h3>
+          <div id="diagnostic-list" class="diagnostic-list empty-content">Нет отчёта</div>
+        </section>
+        <section class="analytics-block">
+          <h3>Границы проверки</h3>
+          <ul id="limitations" class="limitations"><li>Нет отчёта</li></ul>
+        </section>
+      </div>
+
+      <div class="download-bar">
+        <a id="download-result" class="download-button disabled" aria-disabled="true">Скачать GeoJSON</a>
+        <a id="download-validation" class="download-button secondary disabled" aria-disabled="true">Отчёт JSON</a>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

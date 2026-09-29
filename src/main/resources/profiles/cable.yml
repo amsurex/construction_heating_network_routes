@@ -1,0 +1,74 @@
+# Профиль правил: силовой кабель (демонстрация универсальности). Значения ИЛЛЮСТРАТИВНЫЕ
+# (по мотивам ПУЭ 2.3 / СП 42.13330): меньшие отступы, дороги и трамвай — спецпроход в трубе.
+name: cable
+description: "Силовой кабель (пример профиля): малые отступы, пересечения в защитной трубе"
+
+unknown_type:
+  rule: forbidden
+  min_distance_m: 0.6
+
+aliases:
+  school: social_area
+  kindergarten: social_area
+  building: oks
+
+rules:
+  - type: oks
+    rule: forbidden
+    min_distance_m: 0.6
+  - type: park
+    rule: forbidden
+    min_distance_m: 0.6
+  - type: social_area
+    rule: forbidden
+    min_distance_m: 0.6
+  - type: prohibited_site
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: water
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: railway
+    rule: forbidden
+    min_distance_m: 1.0
+  - type: road
+    rule: special
+    min_distance_m: 1.0
+    min_crossing_angle_deg: 45
+    special_margin_m: 2.0
+    k_special: 1.40
+    vertical_clearance_m: 1.0
+    cross_under_only: true
+  - type: tram_tracks
+    rule: special
+    min_distance_m: 1.0
+    min_crossing_angle_deg: 45
+    special_margin_m: 2.0
+    k_special: 1.50
+    vertical_clearance_m: 1.0
+    cross_under_only: true
+  - type: gas_pipeline
+    rule: special
+    min_distance_m: 1.0
+    special_margin_m: 1.0
+    k_special: 1.15
+    own_width_m: 0.40
+    own_height_m: 0.40
+    own_depth_m: 2.8
+    vertical_clearance_m: 0.5
+  - type: power_cable
+    rule: special
+    min_distance_m: 0.5
+    special_margin_m: 1.0
+    k_special: 1.05
+    own_width_m: 0.20
+    own_height_m: 0.20
+    own_depth_m: 2.7
+    vertical_clearance_m: 0.25
+  - type: heat_network
+    rule: special
+    min_distance_m: 2.0
+    special_margin_m: 2.0
+    k_special: 1.10
+    own_depth_m: 3.0
+    vertical_clearance_m: 0.5

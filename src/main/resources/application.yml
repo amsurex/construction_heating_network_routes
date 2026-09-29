@@ -1,0 +1,118 @@
+﻿spring:
+  application:
+    name: krot
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/heat}
+    username: ${DB_USER:heat}
+    password: ${DB_PASSWORD:heat}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 3GB
+      max-request-size: 3073MB
+      file-size-threshold: 0
+
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    max-swallow-size: -1
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+app:
+  storage:
+    # временное дисковое хранилище для загрузок и результатов
+    dir: ${APP_STORAGE_DIR:./data/uploads}
+    # §5 кейса: выгрузка не более 500 МБ; writer останавливается до превышения лимита.
+    max-result-bytes: 524288000
+  jobs:
+    queue-capacity: 50
+    # Оценка для ответа POST: линейная модель по числу точек ОКС.
+    estimate-base-seconds: 5
+    estimate-seconds-per-point: 1.0
+
+  routing:
+    engine: ${APP_ROUTING_ENGINE:core}
+    max-variants: 3
+    # штраф за поворот, м трубы на каждые 45°
+    turn-penalty-m-per45-deg: 4.0
+    # радиус поиска соседей в графе видимости, м
+    neighbor-radius-m: 150.0
+    # запас точек поворота от зоны отступа, м (габарит растёт с ДУ после объединения в магистраль)
+    vertex-clearance-eps-m: 0.5
+    # шаг точек-кандидатов вдоль спецзон (дороги, коммуникации), м
+    special-zone-sample-step-m: 20.0
+    # шаг кандидатов врезки вдоль существующей сети, м
+    tie-in-sample-step-m: 10.0
+    # шаг точек присоединения к уже построенному дереву, м
+    tree-join-sample-step-m: 10.0
+    # зазор между осями новых участков (+ ширина габарита), м
+    new-pipe-clearance-m: 1.0
+    # подход к зданию строго через ближайшую границу (§2.2); false — вход по общей стоимости
+    # допуск привязки существующей камеры к участку (шум координат), м
+    chamber-snap-tol-m: 0.5
+    # область расчёта: охват точек + ближайшая сеть + запас (для входов масштаба города)
+    crop-to-area-of-interest: true
+    area-margin-m: 300.0
+    area-min-extent-m: 1000.0
+    # дополнительных случайных (воспроизводимых) порядков подключения для перебора
+    random-order-strategies: 12
+    random-order-min: 4
+    random-order-budget-points: 240
+    # вариаций порядка от лучших найденных вариантов (итерационный поиск)
+    perturbation-rounds: 8
+    perturbation-iterations: 3
+    # бюджет перебора в проверках отрезков (детерминированная мера работы, не время); 0 — без ограничения
+    search-budget-checks: 40000000
+    # ограничение параллелизма (0 — по числу ядер)
+    max-threads: 0
+    # содержательное различие вариантов (§6): максимальная доля совпадения трасс и допуск совпадения
+    variant-max-overlap: 0.8
+    variant-overlap-tolerance-m: 3.0
+    # выше этого порога вариант не включается вовсе (лучше меньше вариантов, чем «сдвиг той же трассы»)
+    variant-hard-max-overlap: 0.9
+    # вариант с единственным вводом от существующей сети (дороже: длина весит больше камер) — по умолчанию выкл
+    single-root-strategy: false
+    # максимум проходов построения дерева с накоплением подсказок ДУ
+    max-build-passes: 5
+    # проходов локальной оптимизации после жадного построения (0 — выключить)
+    local-search-passes: 2
+    nearest-entry-only: true
+    # вход через ближайшую границу отвергается как необоснованный обход (§2.1), если путь через неё длиннее альтернативы более чем в N раз
+    nearest-entry-max-detour-factor: 2.0
+    # ...и при этом длиннее не менее чем на N м (полная длина трубы до точки) — мелкие обходы «за угол» остаются через ближайшую границу
+    nearest-entry-min-detour-m: 30.0
+    # альтернативных точек входа в здание для A*
+    max-approaches: 12
+    # доплата длиной за приведение угла к 45°/90°, м (п. 19 разъяснений: удорожания углов нет, 45°/90° не обязательны)
+    snap-max-extra-m: 0.0
+    # решётчатое выпрямление (повороты только 45°/90° по ориентации застройки): допустимое удлинение ребра, доля; ≤0 — выкл
+    rectify-max-extra-frac: 0.0
+    rectify-step-m: 2.0
+    rectify-max-expansions: 80000
+    max-expansions: 200000
+    # лимит проверок на один поиск (стоимость неудачного поиска)
+    max-checks-per-search: 1500000
+    repair-max-expansions: 4000
+    # резервный поиск по мелкому растру (экспериментальный, по умолчанию выключен: см. RoutingParams)
+    fallback-grid-step-m: 0
+    fallback-grid-margin-m: 60.0
+    fallback-grid-max-extent-m: 600.0
+    fallback-grid-max-cells: 2000000
+    fallback-grid-max-expansions: 400000
+    routing-diameter-buckets: "200,800,1400"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
