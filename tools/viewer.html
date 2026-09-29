@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Тепловая сеть · просмотр результата</title><link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<style>
+:root{font:15px system-ui,sans-serif;color:#182d3c;background:#f5f7fa}*{box-sizing:border-box}body{margin:0}
+header{padding:18px 24px;background:#102f43;color:white;display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font-size:20px;margin:0}header span{font-size:12px;opacity:.8}main{display:grid;grid-template-columns:360px 1fr;height:calc(100vh - 62px)}
+aside{padding:20px;overflow:auto;border-right:1px solid #d6e0e7}label{display:block;margin:0 0 14px;font-weight:600}
+input,select,button{display:block;margin-top:7px;width:100%;font:inherit}button{border:0;border-radius:6px;padding:10px;background:#147e82;color:white;cursor:pointer}
+button.secondary{background:#dbe7eb;color:#173849}button.active{background:#b42318;color:white}#map{height:100%;background:#e9eff2}
+.help{font-size:13px;line-height:1.55;color:#587080}#status{color:#ad332f;white-space:pre-wrap;font-size:13px}
+.card{background:white;padding:13px;border:1px solid #dbe3e9;border-radius:8px;margin:12px 0}.metric{font-size:22px;font-weight:700;color:#147e82}
+.legend{font-size:13px;line-height:1.9}.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:7px}
+pre{margin:0;white-space:pre-wrap;font:12px ui-monospace,monospace}.labels{background:#ffffffdf;border:0;box-shadow:none;font-size:11px}
+#profile{width:100%;height:170px;background:#f8fbfc;border:1px solid #dbe3e9;border-radius:6px}.profile-label{font-size:11px;fill:#526b79}
+@media(max-width:750px){main{grid-template-columns:280px 1fr}aside{padding:12px}}
+</style></head><body>
+<header><h1>Трассы подключения к теплосети</h1><span>ЛЦТ 2026 · автономный просмотр</span></header>
+<main><aside>
+<label>1. Исходный GeoJSON<input id="input" type="file" accept=".json,.geojson"></label>
+<label>2. Результат расчёта<input id="output" type="file" accept=".json,.geojson"></label>
+<label>3. Отчёт валидатора<input id="validation" type="file" accept=".json"></label>
+<label>Вариант<select id="variant"><option value="">Загрузите результат</option></select></label>
+<label><input id="labels" type="checkbox" style="display:inline;width:auto"> Подписи ДУ и расхода</label>
+<label><input id="special" type="checkbox" checked style="display:inline;width:auto"> Подсвечивать спецучастки</label>
+<button id="violations" class="secondary">Показать нарушения</button>
+<button id="fit">Показать все объекты</button><div id="summary"></div><div id="depth" class="card" hidden>
+<strong>Продольный профиль глубины</strong><p id="profile-caption" class="help"></p><svg id="profile" viewBox="0 0 320 170" role="img"></svg></div><div id="report"></div>
+<div class="legend"><p><i class="dot" style="background:#64748b"></i>Существующая сеть<br>
+<i class="dot" style="background:#087f8c"></i>Новая сеть<br><i class="dot" style="background:#d97706"></i>Спецпроход<br>
+<i class="dot" style="background:#dc3545"></i>Точки ОКС<br><i class="dot" style="background:#153e56"></i>Камеры<br>
+<i class="dot" style="background:#b42318"></i>Нарушение валидатора</p></div>
+<p class="help">Во всплывашках показаны `serves_oks`, `reason`, `approach` и `cost_breakdown`, если они есть.
+Файлы остаются в браузере. Подложка и интернет не нужны. Viewer рассчитан на демонстрационные выборки до 50 МБ.</p>
+<div id="status" role="status"></div></aside><div id="map"></div></main>
+<script src="vendor/leaflet/leaflet.js"></script><script>
+'use strict';
+const map=L.map('map',{preferCanvas:true}).setView([55,39],13);map.attributionControl.setPrefix('Leaflet · офлайн');
+L.control.scale({imperial:false}).addTo(map);
+let original=null,result=null,report=null,inputLayer=null,resultLayer=null,violationLayer=null,violationsVisible=false;
+const el=id=>document.getElementById(id),money=n=>Number(n).toLocaleString('ru-RU',{maximumFractionDigits:2});
+const colors={heat_network:'#64748b',heat_chamber:'#153e56',source:'#7546a5',oks_connection_point:'#dc3545',technical_node:'#147e82',restriction:'#87949d'};
+const key=value=>String(value), selectedSummary=()=>result?.features.filter(f=>f.properties.object_type==='variant_summary')[Number(el('variant').value)];
+function popup(feature){const p=feature.properties||{},shown={id:p.id,object_type:p.object_type,variant_id:p.variant_id,diameter:p.diameter,
+ flow_tph:p.flow_tph,length:p.length,laying_method:p.laying_method,depth_start:p.depth_start,depth_end:p.depth_end,cost:p.cost,
+ serves_oks:p.serves_oks,reason:p.reason,approach:p.approach,cost_breakdown:p.cost_breakdown};
+ const pre=document.createElement('pre');pre.textContent=JSON.stringify(Object.fromEntries(Object.entries(shown).filter(([,v])=>v!==undefined)),null,2);return pre;}
+function layer(data,output){return L.geoJSON(data,{style:f=>{const special=output&&f.properties.laying_method==='special'&&el('special').checked;
+ return {color:output?(special?'#d97706':'#087f8c'):(colors[f.properties.object_type]||'#87949d'),weight:output?4:2,fillOpacity:.12,dashArray:special?'8 5':null};},
+ pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:f.properties.object_type==='heat_chamber'?6:4,color:colors[f.properties.object_type]||'#147e82',fillOpacity:1}),
+ onEachFeature:(f,l)=>{l.bindPopup(popup(f));if(el('labels').checked&&output&&f.properties.object_type==='heat_network'){
+ const tag=document.createElement('span');tag.textContent=`ДУ ${f.properties.diameter} · ${money(f.properties.flow_tph)} т/ч`;
+ l.bindTooltip(tag,{permanent:true,className:'labels'});}}}).addTo(map);}
+function card(title,value){const div=document.createElement('div');div.className='card';const label=document.createElement('div');label.textContent=title;
+ const metric=document.createElement('div');metric.className='metric';metric.textContent=value;div.append(label,metric);return div;}
+function variantFeatures(){const summary=selectedSummary();return summary?result.features.filter(f=>f.properties.variant_id===summary.properties.variant_id):[];}
+function render(){if(inputLayer)map.removeLayer(inputLayer);if(resultLayer)map.removeLayer(resultLayer);if(violationLayer)map.removeLayer(violationLayer);
+ if(original)inputLayer=layer(original,false);el('summary').replaceChildren();if(result){const summary=selectedSummary();if(!summary)return;const p=summary.properties;
+ resultLayer=layer({type:'FeatureCollection',features:variantFeatures().filter(f=>f.geometry)},true);
+ el('summary').append(card('Ранг '+p.rank+' · score',money(p.score)),card('Стоимость строительства',money(p.construction_cost)+' ₽'),
+ card('Новая сеть',money(p.new_network_length)+' м'),card('Валидация',`${p.validation_errors??'—'} ошибок · ${p.validation_warnings??'—'} предупреждений`));
+ const description=document.createElement('p');description.textContent=p.description||'';description.className='help';el('summary').append(description);renderProfile();}
+ if(violationsVisible)renderViolations();}
+function rootIds(features){const roots=new Set();(original?.features||[]).filter(f=>f.properties.object_type==='heat_chamber').forEach(f=>roots.add(key(f.properties.id)));
+ features.filter(f=>f.properties.object_type==='heat_chamber'&&f.properties.tie_in_pipe_id!=null).forEach(f=>roots.add(key(f.properties.id)));return roots;}
+function depthPath(pipes,features){const adjacent=new Map();pipes.forEach(pipe=>[pipe.properties.start_node_id,pipe.properties.end_node_id].forEach(id=>{
+ const k=key(id);if(!adjacent.has(k))adjacent.set(k,[]);adjacent.get(k).push(pipe);}));const roots=rootIds(features);
+ const targets=(original?.features||[]).filter(f=>f.properties.object_type==='oks_connection_point').map(f=>key(f.properties.id));let best=[];
+ function walk(node,seen,path){if(roots.has(node)&&path.length){if(path.length>best.length)best=path.slice();return;}for(const pipe of adjacent.get(node)||[]){
+  if(seen.has(pipe))continue;seen.add(pipe);const forward=key(pipe.properties.start_node_id)===node;const next=key(forward?pipe.properties.end_node_id:pipe.properties.start_node_id);
+  path.push({pipe,forward});walk(next,seen,path);path.pop();seen.delete(pipe);}}
+ targets.forEach(target=>walk(target,new Set(),[]));return best.length?best:pipes.map(pipe=>({pipe,forward:true}));}
+function renderProfile(){const features=variantFeatures(),pipes=features.filter(f=>f.properties.object_type==='heat_network'&&f.properties.depth_start!=null&&f.properties.depth_end!=null);
+ el('depth').hidden=!pipes.length;if(!pipes.length)return;const path=depthPath(pipes,features);let distance=0;const points=[];path.forEach(({pipe,forward})=>{
+ const p=pipe.properties,start=forward?p.depth_start:p.depth_end,end=forward?p.depth_end:p.depth_start,length=Number(p.length)||0;
+ points.push([distance,Number(start)]);distance+=length;points.push([distance,Number(end)]);});const values=points.map(p=>p[1]);let min=Math.min(...values),max=Math.max(...values);
+ if(max-min<.1){min-=.05;max+=.05;}const sx=x=>35+x/Math.max(distance,1)*270,sy=y=>15+(y-min)/(max-min)*125;
+ const svg=el('profile');svg.replaceChildren();const ns='http://www.w3.org/2000/svg',make=(name,attrs,text)=>{const n=document.createElementNS(ns,name);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));if(text)n.textContent=text;svg.append(n);return n;};
+ make('line',{x1:35,y1:15,x2:35,y2:140,stroke:'#9bb0bc'});make('line',{x1:35,y1:140,x2:305,y2:140,stroke:'#9bb0bc'});
+ make('polyline',{points:points.map(p=>`${sx(p[0])},${sy(p[1])}`).join(' '),fill:'none',stroke:'#147e82','stroke-width':3});
+ make('text',{x:2,y:20,class:'profile-label'},max.toFixed(2)+' м');make('text',{x:2,y:140,class:'profile-label'},min.toFixed(2)+' м');
+ make('text',{x:240,y:160,class:'profile-label'},money(distance)+' м');el('profile-caption').textContent=`Путь из ${path.length} участков; глубина до верха габарита.`;}
+function renderViolations(){if(violationLayer)map.removeLayer(violationLayer);if(!report||!violationsVisible)return;const ids=new Set((report.diagnostics||[]).map(d=>key(d.objectId)));
+ const selected=[...(original?.features||[]),...variantFeatures()].filter(f=>f.geometry&&ids.has(key(f.properties.id)));violationLayer=L.geoJSON({type:'FeatureCollection',features:selected},{
+ style:()=>({color:'#b42318',weight:8,opacity:.85,fillOpacity:.3}),pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:10,color:'#b42318',weight:4,fillOpacity:.35}),
+ onEachFeature:(f,l)=>{const issues=(report.diagnostics||[]).filter(d=>key(d.objectId)===key(f.properties.id));l.bindPopup(issues.map(d=>`${d.severity} ${d.rule}: ${d.message}`).join('\n'));}}).addTo(map);}
+function fit(){const layers=[inputLayer,resultLayer,violationLayer].filter(Boolean);if(layers.length){const bounds=L.featureGroup(layers).getBounds();if(bounds.isValid())map.fitBounds(bounds.pad(.08));}}
+async function read(event,kind){el('status').textContent='';try{const file=event.target.files[0];if(!file)return;if(file.size>50*1024*1024)throw Error('Для viewer используйте выборку до 50 МБ.');
+ const data=JSON.parse(await file.text());if(kind==='validation'){report=data;el('report').replaceChildren(card('Независимая проверка',data.valid?'Нарушений не найдено':`Нарушений: ${data.errorCount}`));
+ const details=document.createElement('details'),title=document.createElement('summary'),pre=document.createElement('pre');title.textContent='Диагностика, правила и границы проверки';pre.textContent=JSON.stringify(data,null,2);details.append(title,pre);el('report').append(details);render();return;}
+ if(data.type!=='FeatureCollection'||!Array.isArray(data.features))throw Error('Ожидается GeoJSON FeatureCollection');if(kind==='input')original=data;else{result=data;el('variant').replaceChildren();
+ data.features.filter(f=>f.properties.object_type==='variant_summary').sort((a,b)=>a.properties.rank-b.properties.rank).forEach((f,i)=>{const option=document.createElement('option');option.value=i;
+ option.textContent=`Вариант ${f.properties.variant_id} · ранг ${f.properties.rank}`;el('variant').append(option);});}render();fit();}catch(error){el('status').textContent=error.message;}}
+['input','output','validation'].forEach(k=>el(k).addEventListener('change',e=>read(e,k)));['variant','labels','special'].forEach(k=>el(k).addEventListener('change',render));
+el('violations').addEventListener('click',()=>{violationsVisible=!violationsVisible;el('violations').classList.toggle('active',violationsVisible);el('violations').textContent=violationsVisible?'Скрыть нарушения':'Показать нарушения';render();});el('fit').addEventListener('click',fit);
+</script></body></html>
