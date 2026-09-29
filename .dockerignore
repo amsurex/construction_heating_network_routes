@@ -1,0 +1,9 @@
+.git
+target
+data/*
+!data/invalid
+!data/invalid/**
+.tools
+.idea
+.env
+*.log
